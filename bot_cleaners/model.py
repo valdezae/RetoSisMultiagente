@@ -136,7 +136,6 @@ class Packages(Agent):
 class Shelves(Agent):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
-        self.shelf_id = None
         self.current_packages = list()
         self.is_free = True
         self.current_package_skus = list()
