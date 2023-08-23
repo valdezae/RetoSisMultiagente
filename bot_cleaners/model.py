@@ -131,6 +131,16 @@ class Packages(Agent):
                     if isinstance(obj, Ant) and obj.pos == self.pos:
                         self.target_pos = filtered_neighbours[0].target_pos
                         self.state = 2
+        if self.state == 2:  # Si está en tránsito
+            for neighbour in filtered_neighbours:
+                if isinstance(neighbour, Shelves) and neighbour.pos == self.pos:
+                    neighbour.current_packages.append(self)  # Agregar el paquete a la lista de paquetes del estante
+                    self.state = 3  # Cambia a estado enviado
+
+    # Nueva parte para detectar estar en un Conveyor de salida
+        for neighbour in filtered_neighbours:
+            if isinstance(neighbour, Conveyors) and neighbour.has_package:  # Se agrega esta condición
+                self.state = 3  # Cambia a estado enviado
 
 
 class Shelves(Agent):
