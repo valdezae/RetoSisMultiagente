@@ -94,6 +94,7 @@ class Conveyors(Agent):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
         self.has_package = False
+        self.state = 0  # 1 Entrance, 2 Exit
 
 
 class Packages(Agent):
@@ -131,21 +132,12 @@ class Packages(Agent):
                     if isinstance(obj, Ant) and obj.pos == self.pos:
                         self.target_pos = filtered_neighbours[0].target_pos
                         self.state = 2
-        if self.state == 2:  # Si está en tránsito
-            for neighbour in filtered_neighbours:
-                if isinstance(neighbour, Shelves) and neighbour.pos == self.pos:
-                    neighbour.current_packages.append(self)  # Agregar el paquete a la lista de paquetes del estante
-                    self.state = 3  # Cambia a estado enviado
-
-    # Nueva parte para detectar estar en un Conveyor de salida
-        for neighbour in filtered_neighbours:
-            if isinstance(neighbour, Conveyors) and neighbour.has_package:  # Se agrega esta condición
-                self.state = 3  # Cambia a estado enviado
 
 
 class Shelves(Agent):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
+        self.shelf_id = None
         self.current_packages = list()
         self.is_free = True
         self.current_package_skus = list()
@@ -154,3 +146,48 @@ class Shelves(Agent):
 class CentralSystem(Agent):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
+
+    def entrance_pos(self):
+        for cell in self.model.grid.coord_iter():
+            cell_content, pos = cell
+            for obj in cell_content:
+                if isinstance(obj, Conveyors) and obj.state == 1 and obj.has_package:
+                    return pos
+        return None
+
+    def exit_pos(self):
+        for cell in self.model.grid.coord_iter():
+            cell_content, pos = cell
+            for obj in cell_content:
+                if isinstance(obj, Conveyors) and obj.state == 2:
+                    return pos
+
+    def free_shelf(self):  # This function finds a free space in a shelf for a new package
+        for cell in self.model.grid.coord_iter():
+            cell_content, pos = cell
+            for obj in cell_content:
+                if isinstance(obj, Shelves) and obj.is_free:
+                    return pos  # Returns the first free space found
+        return None  # If no free spaces are found (make ant stay at rest?)
+
+    def step(self):
+        for ant in self.model.schedule.agents:
+            if isinstance(ant, Ant):
+                if ant.state == 0:  # Go to the entrance conveyor IF the entrance conveyor has a package
+                    entrance_posit = self.entrance_pos()
+                    if entrance_posit:
+                        ant.state = 1
+                        ant.target_pos = entrance_posit
+                    else:
+                        ant.target_pos = ant.pos
+                elif ant.state == 1:  # Go to a free shelf to transport the package to it
+                    free_shelf_pos = self.free_shelf()
+                    if free_shelf_pos is not None:
+                        ant.target_pos = free_shelf_pos
+                    else:
+                        ant.target_pos = ant.pos
+                elif ant.state == 2:  # Take the package to the exit conveyor belt
+                    exit_conveyor_posit = self.exit_pos()
+                    ant.target_pos = exit_conveyor_posit
+                elif ant.state == 3:  # After delivering to the exit belt?
+            # Termina el avance
