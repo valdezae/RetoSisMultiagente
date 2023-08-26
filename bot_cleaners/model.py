@@ -74,6 +74,9 @@ class Ant(Agent):
                     self.target_pos = self.haul_destination_pos
                     self.state = 3
                 # leaving at exit conveyor
+                elif isinstance(obj, Shelves) and obj.pos == self.pos and self.state == 3:
+                    self.state = 0
+                    self.target_pos = (0, 0)
                 elif isinstance(obj, Conveyors) and obj.pos == self.pos and self.state == 3:
                     self.state = 0
                     self.target_pos = (0, 0)
@@ -146,13 +149,27 @@ class Shelves(Agent):
 class CentralSystem(Agent):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
+        self.entrance_position = (0,0)
+        self.exit_position = (0,0)
 
     def entrance_pos(self):
-        for cell in self.model.grid.coord_iter():
+        for cell in self.entrance_position:
             cell_content, pos = cell
             for obj in cell_content:
                 if isinstance(obj, Conveyors) and obj.state == 1 and obj.has_package:
                     return pos
+        return None
+
+    def find_closest_agent_to_objective(self, objective):
+        least_distance_to_objective = math.inf
+        closest_agent = None
+        for agent in self.model.grid.coord_iter():
+            if isinstance(agent, Ant) and agent.state == 0:
+                distance_to_objective = math.dist(agent.pos, objective)
+                if distance_to_objective < least_distance_to_objective:
+                    least_distance_to_objective = distance_to_objective
+                    closest_agent = agent
+                    return closest_agent
         return None
 
     def exit_pos(self):
@@ -170,24 +187,31 @@ class CentralSystem(Agent):
                     return pos  # Returns the first free space found
         return None  # If no free spaces are found (make ant stay at rest?)
 
+    def generate_exit_mission_package(self):
+        if self.free_shelf() is None:
+            for cell in self.model.grid.coord_iter():
+                cell_content, pos = cell
+                for obj in cell_content:
+                    if isinstance(obj, Packages):
+                        return pos  # Returns the first free space found
+
     def step(self):
-        for ant in self.model.schedule.agents:
-            if isinstance(ant, Ant):
-                if ant.state == 0:  # Go to the entrance conveyor IF the entrance conveyor has a package
-                    entrance_posit = self.entrance_pos()
-                    if entrance_posit:
-                        ant.state = 1
-                        ant.target_pos = entrance_posit
-                    else:
-                        ant.target_pos = ant.pos
-                elif ant.state == 1:  # Go to a free shelf to transport the package to it
-                    free_shelf_pos = self.free_shelf()
-                    if free_shelf_pos is not None:
-                        ant.target_pos = free_shelf_pos
-                    else:
-                        ant.target_pos = ant.pos
-                elif ant.state == 2:  # Take the package to the exit conveyor belt
-                    exit_conveyor_posit = self.exit_pos()
-                    ant.target_pos = exit_conveyor_posit
-                elif ant.state == 3:  # After delivering to the exit belt?
+
+        # creates mission for entry conveyor
+        if self.entrance_pos() is not None:
+            closest_ant = self.find_closest_agent_to_objective(self.entrance_pos())
+            closest_ant.state = 1
+            closest_ant.target_pos = self.entrance_pos()
+            closest_ant.haul_destination_pos = self.free_shelf()
+
+        # creates package exit mission
+        chance = random.randint(1, 100)
+        if self.free_shelf() is  None and chance < 75:
+            package_pos = self.generate_exit_mission_package()
+            closest_ant = self.find_closest_agent_to_objective(package_pos)
+            closest_ant.state = 2
+            closest_ant.target_pos = package_pos
+            closest_ant.haul_destination_pos = self.exit_position
+
+
             # Termina el avance
