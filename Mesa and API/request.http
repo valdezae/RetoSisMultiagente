@@ -1,0 +1,21 @@
+GET http://localhost:5000/api/state
+Accept: application/json
+
+###
+
+POST http://127.0.0.1:5000/api/init
+Content-Type: application/json
+
+{}
+
+
+
+###
+
+POST http://127.0.0.1:5000/api/step
+Content-Type: application/json
+
+{}
+
+###
+
